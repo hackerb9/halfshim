@@ -171,7 +171,7 @@ def load_second_stage_bootloader(filename):
                 fp.close()
                 sys.exit(0)
         
-        c = fp.read(1024)
+        c = fp.read()
         i = len(c) - 1
         while i > 0:
                 sp.write(c[i])
