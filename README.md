@@ -76,8 +76,9 @@ Well, you can try this program. When you send HALFSHIM (instead of
 H89LDR2) to the Stage 0 bootstrap, it will wait for yet another
 program to be sent over the serial port. This time it will expect an
 8-byte header before the binary code. That header lets us choose where
-the program will be loaded, have any length of program, and, after
-loading, jump to execute any arbitrary address we want.
+the program will be loaded, how many bytes to receive, and jump to
+any arbitrary address we want. (Even back to this ½ stage loader, if
+more parts are needed to load into memory.)
  
 ### Header format
 
@@ -136,8 +137,11 @@ For cross assembly, use asmx -l -e -b2329H -C8080 HALFSHIM.ASM
 
 2. Output text to the H89 / H19 screen.
 
-3. This version does not handle the H8 w/ cassette/serial board.
+3. Try running non-trivial HDOS .ABS programs by preloading parts of
+   HDOS into RAM. 
 
-   If it had to, it could check if COMTYPE at byte 2313H from
-   BOOTSTRP/BOTSTRP8 is FAH. If so, then use H8-5 code instead
-   of the H8-4/H89 code. (See H89LDR2.ASM).
+4. This version does not handle the H8 w/ cassette/serial board.
+   Should a different version be made? If it had to, it could check if
+   COMTYPE at byte 2313H from BOOTSTRP/BOTSTRP8 is FAH. If so, then
+   use H8-5 code instead of the H8-4/H89 code. (See H89LDR2.ASM).
+
