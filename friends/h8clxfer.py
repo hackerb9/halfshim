@@ -136,12 +136,43 @@ import sys, os, serial, string, binascii, time, getopt
 
 # ------------- User modifiable settings ------------------------------
 # Default Serial port settings
-SERIAL_PORT = '/dev/ttyUSB0'
-BAUD_RATE = 9600
+serialargs={'port': '/dev/ttyUSB0',
+            'baudrate': 9600,
+            'stopbits': 2,
+            'timeout': 1,
+            # Todo:
+            #   -hupcl: do not send a hangup signal when tty closed 
+            #   parmrk: mark parity errors (with a 255-0-character sequence)
+            #   inpck: enable input parity checking
+
+            # The following are already the default but can be changed.
+            'bytesize': 8,
+            'parity': 'N',
+            'xonxoff': False,
+            'rtscts': False,
+}
 
 # ------------- End of user modifiable settings -----------------------
 
 VERSION = '0.8+3'
+
+def open_serial(**kwargs) -> serial.Serial:
+        for key in serialargs:
+                if not kwargs.get(key):
+                        kwargs[key] = serialargs[key]
+        try:
+                sp = serial.Serial(**kwargs)
+                print( f'Serial port open {sp.port}'
+                       f' {sp.baudrate}'
+                       f' {sp.bytesize}-{sp.parity}-{sp.stopbits}'
+                       f' timeout={sp.timeout}' )
+        except serial.SerialException as e:
+                print( f'Fatal error - Could not open serial port "{serialargs['port']}".' )
+                print( e )
+                print( "\nExiting." )
+                sys.exit(1)
+        return sp
+
 
 def load_second_stage_bootloader(filename):
         '''
@@ -153,14 +184,7 @@ def load_second_stage_bootloader(filename):
 ;     done correctly. If it returns with " Already Loaded" you are
 ;     OK. It prompts for the machine configuration to load the correct
 ;     code for your machine.'''
-        try:
-                sp = serial.Serial(SERIAL_PORT, BAUD_RATE, stopbits=serial.STOPBITS_TWO, timeout=1)
-                print( "%s%s%s%s%s" % ("Serial port open [",SERIAL_PORT," ] [",BAUD_RATE,"]...") )
-        except:
-                print( "Fatal error - Could not open serial port...\n" )
-                print( "Exiting..." )
-                sys.exit(1)
-
+        sp = open_serial(timeout=1)
         fp = open(filename,"rb")
         print( "\nUploading the second stage boot loader..." )
         sp.write(b'L')
@@ -197,14 +221,7 @@ def save_image_loader():
 ; S - Save this image loader to disk as a stand alone boot
 ;      ( not HDOS ). The disk must be originally formatted
 ;      with V = 0. It returns a S when complete.'''
-        try:
-                sp = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
-                print( "%s%s%s%s%s" % ("Serial port open [",SERIAL_PORT," ] [",BAUD_RATE,"]...") )
-        except:
-                print( "Fatal error - Could not open serial port...\n" )
-                print( "Exiting..." )
-                sys.exit(1)
-
+        sp = open_serial(timeout=1)
         print( "Saving the boot loader to disk..." )
         set_volume_number(sp, "00")
         sp.write(b'S')
@@ -294,14 +311,7 @@ def cmdline_read_floppy(typeofdisk,filename):
         fp = open(filename,"wb")
         track = 1
 
-        try:
-                sp = serial.Serial(SERIAL_PORT, BAUD_RATE, stopbits=serial.STOPBITS_TWO, timeout=None)
-                print( "%s%s%s%s%s" % ("Serial port open [",SERIAL_PORT," ] [",BAUD_RATE,"]...") )
-        except:
-                print( "Fatal error - Could not open serial port...\n" )
-                print( "Exiting..." )
-                sys.exit(1)
-
+        sp = open_serial(timeout=None)
         print( "\nTracks:" )
         vol = get_volume_number(typeofdisk,sp)
         
@@ -344,14 +354,7 @@ def cmdline_write_floppy(typeofdisk, filename):
 
         track = 1
 
-        try:
-                sp = serial.Serial(SERIAL_PORT, BAUD_RATE, stopbits=serial.STOPBITS_TWO, timeout=None)
-                print( "%s%s%s%s%s" % ("Serial port open [",SERIAL_PORT," ] [",BAUD_RATE,"]...") )
-        except:
-                print( "Fatal error - Could not open serial port...\n" )
-                print( "Exiting..." )
-                sys.exit(1)
-
+        sp = open_serial(timeout=None)
         if typeofdisk == "cpm":
                 set_volume_number(sp,"00")
         else:
@@ -392,8 +395,8 @@ def cmdline_write_floppy(typeofdisk, filename):
 def usage():
         print( "\n" )
         print( "========================================================================" )
-        print( "h8clxfer.py - Version "+VERSION+" - Copyright George Farris, 2011. - GPLv3" )
-        print( "              Serial Port - "+SERIAL_PORT+" ",BAUD_RATE,"bps" )
+        print( f"h8clxfer.py - Version {VERSION} - Copyright George Farris, 2011. - GPLv3" )
+        print( f"              Serial Port - {serialargs['port']} {serialargs['baudrate']} bps" )
         print( "========================================================================\n" )
 
         print( "h8clxfer.py is used to read, write and load / save the boot loader on an H8" )
@@ -438,9 +441,9 @@ if __name__ == "__main__":
                         typeofdisk = arg
                         print( "Type of disk " + typeofdisk )
                 elif opt in ("-p", "--port"):
-                        SERIAL_PORT = arg
+                        serialargs['port'] = arg
                 elif opt in ("-b", "--baud"):
-                        BAUD_RATE = arg
+                        serialargs['baudrate'] = arg
                 elif opt in ("-w", "--write"):
                         cmd = 'write'
                 elif opt in ("-r", "--read"):
