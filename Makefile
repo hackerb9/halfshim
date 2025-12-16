@@ -1,2 +1,8 @@
 HALFSHIM.BIN:
 	asmx -b2329H -e -w -C8080 HALFSHIM.ASM && mv HALFSHIM.ASM.bin HALFSHIM.BIN
+
+send: HALFSHIM.BIN
+	friends/h8clxfer.py -l -f HALFSHIM.BIN
+
+clean:
+	rm HALFSHIM.BIN
