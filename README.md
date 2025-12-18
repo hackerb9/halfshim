@@ -27,7 +27,7 @@ Send HALFSHIM.BIN instead of H89LDR2.BIN. Then send SOMEFILE.ABS.
 ## Usage
 
 After keying in Dwight Elvey's BOOTSTRP, send the HALFSHIM binary from
-a PC using [h8clxfer.py][h8clxfer]:
+a PC using hackerb9's updated version of [h8clxfer.py][h8clxfer]:
 
     h8clxfer.py -l -f HALFSHIM.BIN
 
@@ -101,6 +101,13 @@ this code's ORG (2329H).
 ## Creating the bin file
 
 For cross assembly, use asmx -l -e -b2329H -C8080 HALFSHIM.ASM
+
+Although it is not necessary for this program, you may wish to try
+[Mark Garlanger's hacked version of asmx][mgasmx] which has been
+modified for Heathkit computers, such as the ability to directly
+create HDOS .ABS files.
+
+[mgasmx]: https://github.com/mgarlanger/asmx
 
 ## Caveats
 
