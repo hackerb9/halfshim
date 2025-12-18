@@ -12,7 +12,7 @@
 
 
 ;;; CREATING THE BIN FILE
-;;; For cross assembly, use asmx -l -e -b1000H -C8080 QUARTERSHIM.ASM
+;;; For cross assembly, use asmx -l -e -b2329H -C8080 QUARTERSHIM.ASM
 
 ;;; USAGE
 ;;; After keying in BOOTSTRP.OCL, send the QUARTERSHIM binary from a PC:
@@ -45,7 +45,7 @@ DBEND   EQU     265BH	; Data Block End address from BOOTSTRP.ASM
 	;; To unwrite protect floppy RAM (1000H to 17FFH):
 	;; Set bit 7 of port 7F to 1. 
 	IN	7FH
-	ORA	80H
+	ORI	80H
 	OUT	7FH
 
 	;; Serial port setup copied from BOOTSTRP.ASM... probably not necessary.
