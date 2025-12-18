@@ -122,8 +122,7 @@ class H89Trans:
         except serial.SerialException as e:
             print(f"\n--- ERROR: Could not open port {port} ---")
             print(f"Details: {e}")
-#XXX
-#            exit(1)
+            exit(1)
 
     def set_interleave(self):
         """SetIntrLv: Ask user what floppy disk interleave they would like"""
