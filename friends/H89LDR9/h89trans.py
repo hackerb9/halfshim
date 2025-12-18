@@ -296,8 +296,14 @@ class H89Trans:
             # addr  = s[2] | s[3]<<8
             # length= s[4] | s[5]<<8
             # entry = s[6] | s[7]<<8
-            print(f'Magic: {magic:04X}H, Load Addr: {addr:04X}H, Length: {length:04X}H, entry: {entry:04X}')
-            if of RAM and will fail.\n')
+            print(f'Magic: {magic:04X}H, Load Addr: {addr:04X}H, Length: {length:04X}H, entry: {entry:04X}') 
+            if magic != 255:
+                print('\n    WARNING: This does not look like an ABS file\n')
+            endaddr=addr+length
+            if addr < 0x2329 < endaddr:
+                print('\n    WARNING: This will overwrite HALFSHIM (0x2329) and will fail.\n')
+            if endaddr > 0xFFFF:
+                print('\n    WARNING: This will write beyond 64K of RAM and will fail.\n')
             if entry == 0x2329:
                 print('\n    NOTE: This is a multipart file which returns to HALFSHIM.\n')
             elif entry < addr or endaddr < entry:
