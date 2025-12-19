@@ -87,7 +87,7 @@ class H89Trans:
     def __init__(self):
         self.ser = None            	# The serial.Serial object.
         self.port = None        	# Automatically detected
-        self.default_baud = 9600        # 9600 is good for H89's H-8-4
+        self.default_baud = 9600        # 9600 is good for H89's H8-4
         self.interleave_factor = 1 	# Write 1:1 disk interleave by default
         self.num_tracks = 40            # 40 track disks
         self.track_size = 0x0A00 	# 2560 bytes per track
@@ -555,16 +555,18 @@ class H89Trans:
     def display_menu(self):
         """Cmnd?: Show options and get a key"""
         print("")
-        print("V set volume#  ( now:",
-              f"Override = {self.vol}" if self.override else "From Image", ")")
-        print("O open/create image file  ( now:",
-              f"{self.fp.name}" if self.fp else "None", ")")
+        print("V set volume#  [now:",
+              f"Override = {self.vol}]" if self.override else "From Image]")
+        print("O open/create image file  [now: "
+              f"{self.fp.name if self.fp else 'None'}]")
         print("W write image to H89")
         print("R read image from H89")
         print("L Send H89LDR2.BIN to H89")
         print("S Save loader on H89")
-        print("I Set interleave  = 1:" f"{self.interleave_factor}")
-        print("B Set Baud rate (for use with H8-5)")
+        print("I Set interleave  [= 1:"
+              f"{self.interleave_factor}"  "]")
+        print("B Set Baud rate  [= "
+              f"{self.ser.baudrate}" "] (for use with H8-5)")
         print("X exit to DOS")
 
         return get_key("\nCommand? ").upper() 
