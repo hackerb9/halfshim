@@ -96,10 +96,12 @@ GETCH:	IN      LSTAT       ; Get serial port status
         RET
 
 CHROUT:
+        MOV D, A
         IN LSTAT
-        ANI 60H			; Logical OR with A register
+        ANI 60H			; Logical OR to get ready bit
         CPI 60H			; Is UART ready to send?
         JNZ CHROUT
+        MOV A, D
         OUT TX
         RET
 
