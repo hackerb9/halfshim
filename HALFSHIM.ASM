@@ -37,6 +37,9 @@
 ;;; proper position independent code. The ABS format also allows us to
 ;;; send programs of any length (not just 818 bytes) and to jump to
 ;;; any specified entry point when finished.
+;;; 
+;;; Since the incoming ABS file could be located anywhere in user RAM,
+;;; this program runs from floppy RAM so it doesn't tromp upon itself.
 
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b1400H -C8080 HALFSHIM.ASM
@@ -60,7 +63,7 @@ FBEGIN	EQU	1400H		; Floppy RAM address
 FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 
 ;;; This code lives in the Floppy RAM buffer which must be unlocked
-;;; before it can be written to. (Set bit 7 on port 7FH). See QUARTERSHIM.
+;;; before it can be written to. (See QUARTERSHIM.ASM).
         ORG	FBEGIN	
 
 	;; H89TRANS.COM and h89trans.py both send 'A' after loading the second stage.
@@ -70,7 +73,7 @@ FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
         CALL	CHROUT
 
 	;; --- READ HEADER --- 
-SHIM	CALL    GETCH       ; Ignore first two bytes of .ABS file
+SHIM:	CALL    GETCH       ; Ignore first two bytes of .ABS file
 	CALL    GETCH	    ; (TODO: Maybe halt execution if not FF00?)
 
 	CALL    GETCH       ; Get Destination ADDR into DE
@@ -89,7 +92,7 @@ SHIM	CALL    GETCH       ; Ignore first two bytes of .ABS file
         MOV     H,A
 
 	;; --- MAIN LOAD LOOP: Std 16-bit 8080 loop countdown ---
-LOOP	CALL    GETCH       ; Read byte from serial into A
+LOOP:	CALL    GETCH       ; Read byte from serial into A
 	STAX	D	    ; Store byte in destination (*DE)
 	INX	D	    ; Next memory location
         DCX     B           ; Decrement LENGTH (BC) -- (Does not set Z-flag!)
@@ -102,21 +105,21 @@ LOOP	CALL    GETCH       ; Read byte from serial into A
 
 ;;; --- SERIAL INPUT ROUTINE ---
 ;;; (Presumes serial port already configured by Stage 0 loader.)
-GETCH	IN      LSTAT       ; Get serial port status 
+GETCH:	IN      LSTAT       ; Get serial port status 
         RAR		    ; Put "ready" bit in Carry
         JNC     GETCH       ; Wait for char
         IN      RX	    ; Read the byte into A
         RET
 
-
-CHROUT
-        IN LSTAT
-        ANI 60H			; Logical OR with A register
-        CPI 60H			; Is UART ready to send?
-        JNZ CHROUT
-        OUT TX
+CHROUT: 
+        MOV 	D,A
+CHROT2: IN 	LSTAT
+        ANI 	60H		; Logical AND to get not-ready bits
+        CPI 	60H		; Is UART ready to send?
+        JNZ 	CHROT2
+        MOV 	A,D
+        OUT 	TX
         RET
-
 
 ;;; --- PAD GAP ---
 ;;; QUARTERSHIM expects a file exactly 1K in length, so reserve extra bytes.
@@ -125,19 +128,13 @@ PRGEND	DS	FBEGIN+FSIZE-PRGEND-1
 
 
 ;;; NOTES
+
 ;;; 1. Stack pointer is initialized to end of memory by MTR at power-on.
+
 ;;; 2. CPU speed should not be an issue.
-;;;    a. At 9600 baud, a byte arrives approximately every millisecond.
+;;;    a. At 9600 baud, a byte arrives approximately every 1 ms.
 ;;;    b. Execution path from GETCH to GETCH is 54 T-states ≈ 0.027 ms.
-;;; 3. The DS assembler macro is used to bulk out this program to
-;;;    DBEND so that BOOTSTRP.ASM does need not be changed. This
-;;;    program will be loaded into 2329H-265BH, same as H89LDR2.
 
-
-;;; TODO
-;;; A. Test it on actual hardware.
-;;; 
-;;; B. This version does not yet handle the H8 w/ cassette/serial board.
-;;;    Should check if COMTYPE at byte 2313H from BOOTSTRP/BOTSTRP8 is FAH.
-;;;    If so, then should use H8-5 code instead of the H8-4/H89 code.
-;;;    (See H89LDR2.ASM).
+;;; 3. The DS assembler macro is used to bulk out this program to fill
+;;;    the 1K floppy buffer. This is so that future additions to this
+;;;    program will not require changes to QUARTERSHIM.
