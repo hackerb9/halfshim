@@ -1,6 +1,7 @@
 ;;; STAGE 1/4 SHIM LOADER by Hackerb9.
-;;; 
-;;; After a user has keyed in Dwight Elvey's Stage 0 BOOTSTRP.ASM at
+;;; Comes after Stage-0 but before Stage-1/2.
+
+;;; After a user has keyed in Dwight Elvey's BOOTSTRP.ASM (Stage 0) at
 ;;; the Monitor, send this shim program from a host computer over the
 ;;; serial port instead of H89LDR2.ASM. It will unlock the Floppy
 ;;; Drive RAM and load the next stage (HALFSHIM) into that area and
@@ -9,7 +10,6 @@
 ;;; I'm using Floppy RAM because it is the only place I know of that
 ;;; will definitely not be clobbered when the next stage (HALFSHIM)
 ;;; loads up .ABS files to arbitrary locations in memory.
-
 
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b2329H -C8080 QUARTERSHIM.ASM
@@ -48,7 +48,8 @@ DBEND   EQU     265BH	; Data Block End address from BOOTSTRP.ASM
 	ORI	80H
 	OUT	7FH
 
-	;; Serial port setup copied from BOOTSTRP.ASM... probably not necessary.
+	;; Serial port setup copied from BOOTSTRP.ASM
+	;; XXX	... probably not necessary. Cut this out once it is working.
 LDR:    XRA A
         OUT LCNTL       ; LINE CONTROL
         OUT IER         ; NO INTERRUPTS
@@ -64,7 +65,6 @@ LDR:    XRA A
         IN LSTAT
         IN RX           ; CLEAR ANY JUNK
 
-
 	;; H89TRANS.COM and h89trans.py both send 'A' after loading this stage.
 	CALL	GETCH
 	;; Reply with '?' which lets H89TRANS know we're alive.
@@ -73,13 +73,13 @@ LDR:    XRA A
 
 QSHIM:	
         LXI     D,FBEGIN
-	LXI	B,1024		; 1K ought to be enough for anybody
+	LXI	B,1024		; "1K ought to be enough for anybody"
 
 	;; --- Standard 16-bit loop countdown ---
 LOOP:	CALL    GETCH       ; Read byte from serial into A
 	STAX	D	    ; Store byte in destination (*DE)
 	INX	D	    ; Next memory location
-	DCX     B           ; Decrement LENGTH (BC) -- (Does not set Z-flag!)
+	DCX     B           ; Decrement LENGTH (BC) -- Does not set Z-flag!
         MOV     A,B
         ORA     C	    ; Are any bits of B or C set?
         JNZ     LOOP	    ; Get the next byte
