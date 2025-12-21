@@ -175,7 +175,7 @@ class H89Trans:
                     t = t if t.isprintable() else f'{ord(t):02X}'
                     c = self.char_of_wait
                     c = c if c.isprintable() else f'{ord(raw):02X}'
-                    print(f'wait_char: Waiting for "{t}", got "{c}" ({ord(c):02X})', flush=True)
+                    print(f'wait_char: Waiting for "{t}", got "{c}" ({ord(raw):02X})', flush=True)
 
             except serial.SerialException:
                 print("\nConnection lost during wait_char."); return
@@ -457,15 +457,16 @@ class H89Trans:
             print(e)
             return
 
-    def write_loader(self, filename="H89LDR2.BIN"):
+    def write_loader(self, filename="H89LDR2.BIN", ldr_size = None):
         """Load the next stage loader, H89LDR2, on the H89"""
-        LDR_SIZE = (0x265B - 0x2329)  # 818 bytes
+        if not ldr_size:
+            ldr_size = (0x265B - 0x2329)  # 818 bytes for H89LDR2.BIN
         try:
             with open(filename, "rb") as f:
                 data = f.read()
                 file_size=len(data)
-                if file_size != LDR_SIZE:
-                    print(f"Error: {filename} is {file_size} bytes, expected {LDR_SIZE}.")
+                if file_size != ldr_size:
+                    print(f"Error: {filename} is {file_size} bytes, expected {ldr_size}.")
                     return
                 else:
                     print(f"Sending {filename} ({file_size} bytes)...")
@@ -517,14 +518,20 @@ class H89Trans:
             if magic != 255:
                 print('\n    WARNING: This does not look like an ABS file\n')
             endaddr=addr+length
-            if addr < 0x2329 < endaddr:
-                print('\n    WARNING: This will overwrite HALFSHIM (0x2329) and will fail.\n')
             if endaddr > 0xFFFF:
                 print('\n    WARNING: This will write beyond 64K of RAM and will fail.\n')
-            if entry == 0x2329:
+
+            if addr <= 0x1000 and endaddr >= 0x1000+1024-1:
+                print('\n    WARNING: This overwrites HALFSHIM (0x1000) and will fail.\n')
+            if addr <= 0x2329 and endaddr >= 0x2300:
+                print('\n    NOTE: This overwrites BOOTSTRP (0x2300).\n')
+            if addr <= 0x2329 and endaddr >= 0x2329+818-1:
+                print('\n    NOTE: This overwrites QUARTERSHIM (0x2329).\n')
+
+            if entry == 0x1000:
                 print('\n    NOTE: This is a multipart file which returns to HALFSHIM.\n')
             elif entry < addr or endaddr < entry:
-                print('\n    NOTE: The will pass control an address not within the program.\n')
+                print('\n    NOTE: The passes control to an address not within the program.\n')
                 
             self.fp.seek(0)
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
@@ -582,9 +589,10 @@ class H89Trans:
         elif choice == 'I': self.set_interleave()
         elif choice == 'B': self.set_baud_rate()
         elif choice == 'P': self.pp()
-        elif choice == 'H': self.write_loader('HALFSHIM.BIN')
+        elif choice == 'Q': self.write_loader('QUARTERSHIM.BIN')
+        elif choice == 'H': self.write_loader('HALFSHIM.BIN', 1024)
         elif choice == 'A': self.send_abs()
-        elif choice == 'X' or choice == 'Q' or choice == '\x1B': 
+        elif choice == 'X' or choice == '\x1B': 
             print("Exiting to DOS...")
             exit(0)
 
@@ -597,13 +605,13 @@ def split_octal(i):
     Mathematically, that's wrong as the number after 000377 should be
     000400 (in normal octal), but in split octal it is 001000
 
-    I'm using the convention of adding a period between the two bytes
+    I'm using the convention of adding a space between the two bytes
     to help disambiguate, but honestly there's a good reason this
     routine wasn't used: Hexadecimal is simply better for 8-bit bytes.
     """
     if (i<0 or i>65535):
         raise OverflowError('Split octal can only represent numbers from 0 to 65535') 
-    print( f'{i//256:03o}.{i%256:03o}' )
+    print( f'{i//256:03o} {i%256:03o}' )
 
 
 def main():
