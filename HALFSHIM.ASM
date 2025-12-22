@@ -44,6 +44,9 @@
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b1400H -C8080 HALFSHIM.ASM
 
+;;; Version 0.4 December 21, 2025
+;;; -- Now loading correctly at ORG 1400H, however it no longer works!
+;;;    Handshaking problem?
 ;;; Version 0.3 December 17, 2025
 ;;; -- compile to ORG 1400H (Floppy RAM), presuming QUARTERSHIM will load us.
 ;;; Version 0.2 December 14, 2025
@@ -66,33 +69,47 @@ FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 ;;; before it can be written to. (See QUARTERSHIM.ASM).
         ORG	FBEGIN	
 
-	;; H89TRANS.COM and h89trans.py both send 'A' after loading the second stage.
-	CALL	GETCH
-	;; Reply with '?' which lets H89TRANS know we're alive.
-        MVI	A,'?'
+;;;  Weirdly, the floppy starts up when I run this code. Is it because
+;;;  of where it is located in memory?
+	;; Relock the Floppy RAM. (Doesn't seem to work).
+	XRA	A
+	OUT	7FH
+
+AWAIT:
+	CALL	CHRIN
+	CPI	'A'
+	JZ	AYAY
+        MVI	A,'?'		; Reply with '?': Whatchu talkin' bout, Willis?
+        CALL	CHROUT		;; h89trans.py sends '?' after sending HALFSHIM, expects '?'.
+	JMP	AWAIT
+
+	;; h89trans.py sends 'A' before sending an ABS file, expects 'A'.
+AYAY:	
+	;; Reply with 'A': We're ready to receive an ABS file.
+        MVI	A,'A'
         CALL	CHROUT
 
-	;; --- READ HEADER --- 
-SHIM:	CALL    GETCH       ; Ignore first two bytes of .ABS file
-	CALL    GETCH	    ; (TODO: Maybe halt execution if not FF00?)
+	;; --- READ ABS HEADER --- 
+HDR:	CALL    CHRIN       ; Ignore first two bytes of .ABS file
+	CALL    CHRIN	    ; (TODO: Maybe halt execution if not FF00?)
 
-	CALL    GETCH       ; Get Destination ADDR into DE
+	CALL    CHRIN       ; Get Destination ADDR into DE
         MOV     E,A
-        CALL    GETCH
+        CALL    CHRIN
         MOV     D,A
 
-        CALL    GETCH       ; Get LENGTH into BC
+        CALL    CHRIN       ; Get LENGTH into BC
         MOV     C,A
-        CALL    GETCH
+        CALL    CHRIN
         MOV     B,A
 
-	CALL    GETCH       ; Get Jump ADDR into HL
+	CALL    CHRIN       ; Get Jump ADDR into HL
         MOV     L,A
-        CALL    GETCH
+        CALL    CHRIN
         MOV     H,A
 
 	;; --- MAIN LOAD LOOP: Std 16-bit 8080 loop countdown ---
-LOOP:	CALL    GETCH       ; Read byte from serial into A
+LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	STAX	D	    ; Store byte in destination (*DE)
 	INX	D	    ; Next memory location
         DCX     B           ; Decrement LENGTH (BC) -- (Does not set Z-flag!)
@@ -100,21 +117,25 @@ LOOP:	CALL    GETCH       ; Read byte from serial into A
 	ORA	C	    ; Are any bits of B or C set?
 	JNZ     LOOP	    ; Nope, so get the next byte
 	
+	;; Let h89ldr.py know that we've received the file
+        MVI	A,'A'
+        CALL	CHROUT
+
 	;; --- EXECUTE NEXT STAGE ---
-        PCHL                ; Jump to the received code.
+        PCHL                ; Jump to the received code's ENTRY address.
 
 ;;; --- SERIAL INPUT ROUTINE ---
 ;;; (Presumes serial port already configured by Stage 0 loader.)
-GETCH:	IN      LSTAT       ; Get serial port status 
+CHRIN:	IN      LSTAT       ; Get serial port status 
         RAR		    ; Put "ready" bit in Carry
-        JNC     GETCH       ; Wait for char
+        JNC     CHRIN       ; Wait for char
         IN      RX	    ; Read the byte into A
         RET
 
 CHROUT: 
         MOV 	D,A
 CHROT2: IN 	LSTAT
-        ANI 	60H		; Logical AND to get not-ready bits
+        ANI 	60H		; Logical AND to get Transmitter Empty flags
         CPI 	60H		; Is UART ready to send?
         JNZ 	CHROT2
         MOV 	A,D
@@ -133,7 +154,7 @@ PRGEND	DS	FBEGIN+FSIZE-PRGEND-1
 
 ;;; 2. CPU speed should not be an issue.
 ;;;    a. At 9600 baud, a byte arrives approximately every 1 ms.
-;;;    b. Execution path from GETCH to GETCH is 54 T-states ≈ 0.027 ms.
+;;;    b. Execution path from CHRIN to CHRIN is 54 T-states ≈ 0.027 ms.
 
 ;;; 3. The DS assembler macro is used to bulk out this program to fill
 ;;;    the 1K floppy buffer. This is so that future additions to this
