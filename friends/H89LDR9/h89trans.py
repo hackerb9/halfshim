@@ -552,11 +552,11 @@ class H89Trans:
             if endaddr > 0xFFFF:
                 print('\n    WARNING: This writes beyond 64K of RAM!\n')
             if addr <= self.FEND and endaddr >= self.FBEGIN:
-                print('\n    WARNING: This overwrites HALFSHIM ({self.FBEGIN:04X}H) and will fail!\n')
+                print(f'\n    WARNING: This overwrites HALFSHIM ({self.FBEGIN:04X}H) and will fail!\n')
             if addr <= self.BEND and endaddr >= self.BBEGIN:
-                print('    NOTE: This overwrites BOOTSTRP ({self.BBEGIN:04x}).')
+                print(f'    NOTE: This overwrites BOOTSTRP ({self.BBEGIN:04x}).')
             if addr <= self.LEND and endaddr >= self.LBEGIN:
-                print('    NOTE: This overwrites QUARTERSHIM ({self.BEND:04x}).')
+                print(f'    NOTE: This overwrites QUARTERSHIM ({self.BEND:04x}).')
             if entry == self.FBEGIN:
                 print('    NOTE: This multipart file runs HALFSHIM again.')
             else:
@@ -566,12 +566,23 @@ class H89Trans:
                 print('\n    ERROR: {self.fp.name} is not an ABS file!')
                 print(  '           Magic should be 00FFH, not {magic:04X}H\n')
                 return 1
-                
+
+            # Make sure HALFSHIM is running
+            self.ser.write(b'A')
+            print('Checking if HALFSHIM is running on H89... ', end='', flush=True)
+            # This rules out H89LDR2 which will respond '?'
+            self.wait_char(chr(ord('A') ))
+            print('All good.')
+
             self.fp.seek(0)
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
             data = self.fp.read()
+
             self.ser.write(bytes(data))
             print(f"{len(data)} bytes sent")
+            print('Awaiting confirmation from H89... ', end='', flush=True)
+            self.wait_char(chr(ord('A') ))
+            print('Confirmed.')
 
         except OSError as e:
             print(f"Problem reading '{self.fp.name}'?")
