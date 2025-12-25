@@ -1,4 +1,4 @@
-# halfshim: The ½-stage loader for your H89
+# absldr: The ½-stage loader for your H89
 
 Run arbitrary programs on the H89 microcomputer without a floppy drive
 by loading them over the serial port.
@@ -10,28 +10,28 @@ ____
 
 ## Description
 
-After a user has keyed in Dwight Elvey's [BOOTSTRP][H89LDR] at
-the Monitor, send this shim program from a host computer over the
-serial port instead of H89LDR2.ASM. This program will read yet another
-program over the serial port and execute it, similar to BOOTSTRP.ASM.
-The difference is that the next file will be prefixed with an HDOS
-.ABS header, which allows the data to be loaded into any arbitrary
-address and to be of any length.
+After a user has keyed in Dwight Elvey's [BOOTSTRP][H89LDR] at the
+Monitor, send first the QUARTERSHIM program from a host computer over
+the serial port instead of H89LDR2.ASM. That program will read yet
+another program over the serial port, ABSLDR, and execute it, similar to
+BOOTSTRP.ASM. The difference is that the next file will be prefixed
+with an HDOS .ABS header, which allows the data to be loaded into any
+arbitrary address and to be of any length.
 
 [H89LDR]: friends/H89LDR9/
 
 ## Quick Usage
 
-Send HALFSHIM.BIN instead of H89LDR2.BIN. Then send SOMEFILE.ABS. 
+Send ABSLDR.BIN instead of H89LDR2.BIN. Then send SOMEFILE.ABS. 
 
 ## Usage
 
-After keying in Dwight Elvey's BOOTSTRP, send the HALFSHIM binary from
+After keying in Dwight Elvey's BOOTSTRP, send the ABSLDR binary from
 a PC using hackerb9's updated version of [h8clxfer.py][h8clxfer]:
 
-    h8clxfer.py -l -f HALFSHIM.BIN
+    h8clxfer.py -l -f ABSLDR.BIN
 
-After sending HALFSHIM, send an ABS file to start it running:
+After sending ABSLDR, send an ABS file to start it running:
 
     h8clxfer.py -l -f GACTAGA.ABS
 
@@ -48,8 +48,8 @@ After sending HALFSHIM, send an ABS file to start it running:
    [BOOTSTRP.OCL][BOOTSTRP.OCL] with each one separated by
    <kbd>Space</kbd>. When done, hit <kbd>Return</kbd>.
 4. At the **H:** prompt, enter `G 43000` and hit <kbd>Return</kbd>.
-5. On your PC, run `h8clxfer.py -l -f HALFSHIM.BIN` to send
-   HALFSHIM.BIN to your H89. Now the shim is waiting for the next
+5. On your PC, run `h8clxfer.py -l -f ABSLDR.BIN` to send
+   ABSLDR.BIN to your H89. Now the shim is waiting for the next
    program to load.
 6. On your PC, run `h8clxfer.py -l -f SOMEFILE.ABS` to send
    it to your H89. It will start executing automatically.
@@ -72,7 +72,7 @@ serial port.
 But, if your floppy drive isn't working and you still want to try
 running something without keying in every byte, what do you do?
 
-Well, you can try this program. When you send HALFSHIM (instead of
+Well, you can try this program. When you send ABSLDR (instead of
 H89LDR2) to the Stage 0 bootstrap, it will wait for yet another
 program to be sent over the serial port. This time it will expect an
 8-byte header before the binary code. That header lets us choose where
@@ -82,7 +82,7 @@ more parts are needed to load into memory.)
  
 ### Header format
 
-HALFSHIM expects an 8 byte header which is the same as HDOS's .ABS
+ABSLDR expects an 8 byte header which is the same as HDOS's .ABS
 format.
 
 	0: FFH	(binary type)
@@ -94,13 +94,13 @@ format.
 	6: ENTRYPOINT L
 	7: ENTRYPOINT H
 
-HALFSHIM places received data starting at ADDR for LENGTH bytes and
+ABSLDR places received data starting at ADDR for LENGTH bytes and
 then jumps to ENTRYPOINT. To send multiple files, set ENTRYPOINT to
 this code's ORG (2329H).
 
 ## Creating the bin file
 
-For cross assembly, use asmx -l -e -b2329H -C8080 HALFSHIM.ASM
+For cross assembly, use asmx -l -e -b2329H -C8080 ABSLDR.ASM
 
 Although it is not necessary for this program, you may wish to try
 [Mark Garlanger's hacked version of asmx][mgasmx] which has been
@@ -118,13 +118,13 @@ create HDOS .ABS files.
   will call HDOS routines which aren't loaded into memory.
   Theoretically, one might be able to chain together custom .ABS files
   which load the necessary parts of HDOS into RAM, using the
-  ENTRYPOINT address to return to HALFSHIM after each one.
+  ENTRYPOINT address to return to ABSLDR after each one.
 
 * H8 with cassette/serial is not currently supported and is unlikely
   to ever be. The code to handle two different UART chips is uglier
   than I'd like for a tiny program like this. It seems better to
   create a separate program. Additionally, in the future, the plan is
-  to have HALFSHIM show text on the H89 screen when it is running,
+  to have ABSLDR show text on the H89 screen when it is running,
   which would rule out the H8-5 serial card which uses the same I/O
   port as the terminal part of the H89.
 

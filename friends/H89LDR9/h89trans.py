@@ -90,7 +90,7 @@ class H89Trans:
     LEND = 0x265B              # H89LDR2.ASM's DBEND
     LDR_SIZE = LEND-LBEGIN     # H89LDR2.BIN's size (818 bytes)
 
-    FBEGIN = 0x1400             # Floppy RAM start (HALFSHIM's ORG)
+    FBEGIN = 0x1400             # Floppy RAM start (ABSLDR's ORG)
     FEND = 0x1800 - 1           # Floppy RAM last byte
     FSIZE = FEND-FBEGIN+1       # Floppy RAM length (1K)
 
@@ -528,7 +528,7 @@ class H89Trans:
             return
 
     def send_abs(self):
-        """Experimental! If HALFSHIM is loaded, try sending an ABS file to the H89"""
+        """Experimental! If ABSLDR is loaded, try sending an ABS file to the H89"""
         if not self.fp: 
             print('\n  Please first Open an ABS file to send.')
             return
@@ -552,13 +552,13 @@ class H89Trans:
             if endaddr > 0xFFFF:
                 print('\n    WARNING: This writes beyond 64K of RAM!\n')
             if addr <= self.FEND and endaddr >= self.FBEGIN:
-                print(f'\n    WARNING: This overwrites HALFSHIM ({self.FBEGIN:04X}H) and will fail!\n')
+                print(f'\n    WARNING: This overwrites ABSLDR ({self.FBEGIN:04X}H) and will fail!\n')
             if addr <= self.BEND and endaddr >= self.BBEGIN:
                 print(f'    NOTE: This overwrites BOOTSTRP ({self.BBEGIN:04x}).')
             if addr <= self.LEND and endaddr >= self.LBEGIN:
                 print(f'    NOTE: This overwrites QUARTERSHIM ({self.BEND:04x}).')
             if entry == self.FBEGIN:
-                print('    NOTE: This multipart file runs HALFSHIM again.')
+                print('    NOTE: This multipart file runs ABSLDR again.')
             else:
                 if entry < addr or endaddr < entry:
                     print('\n    WARNING: Transfers control an entry point outside the program.\n')
@@ -567,9 +567,9 @@ class H89Trans:
                 print(  '           Magic should be 00FFH, not {magic:04X}H\n')
                 return 1
 
-            # Make sure HALFSHIM is running
+            # Make sure ABSLDR is running
             self.ser.write(b'A')
-            print('Checking if HALFSHIM is running on H89... ', end='', flush=True)
+            print('Checking if ABSLDR is running on H89... ', end='', flush=True)
             # This rules out H89LDR2 which will respond '?'
             self.wait_char(chr(ord('A') ))
             print('All good.')
@@ -635,7 +635,7 @@ class H89Trans:
         elif choice == 'B': self.set_baud_rate()
         elif choice == 'P': self.pp()
         elif choice == 'Q': self.write_loader('QUARTERSHIM.BIN')
-        elif choice == 'H': self.write_loader('HALFSHIM.BIN', self.FSIZE)
+        elif choice == 'H': self.write_loader('ABSLDR.BIN', self.FSIZE)
         elif choice == 'A': self.send_abs()
         elif choice == 'X' or choice == '\x1B': 
             print("Exiting to DOS...")

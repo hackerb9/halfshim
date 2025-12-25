@@ -1,0 +1,179 @@
+;;; STAGE 1/2 SHIM LOADER by Hackerb9.
+;;; 
+;;; Expects an 8 byte header similar to HDOS's .ABS format
+;;; 
+;;; 	0: FFH	(binary type)
+;;; 	1: 00H  (ABS object)
+;;; 	2: ADDR L
+;;; 	3: ADDR H
+;;; 	4: LENGTH L
+;;; 	5: LENGTH H
+;;; 	6: ENTRYPOINT L
+;;; 	7: ENTRYPOINT H
+;;; 
+;;; Places received data starting at ADDR and then jumps to ENTRYPOINT.
+
+;;; SHORT USAGE:
+;;; 
+;;; 	h8clxfer.py -l -f QUARTERSHIM.ASM.bin
+;;; 	h8clxfer.py -l -f ABSLDIR.ASM.bin
+;;; After sending ABSLDIR, send an ABS file to start it running:
+;;; 	h8clxfer.py -l -f GACTAGA.ABS
+
+;;; USAGE EXPLANATION:
+;;; 
+;;; After a user has keyed in Dwight Elvey's BOOTSTRP.OCL at the
+;;; Monitor, send the QUARTERSHIM.BIN from a host computer over the
+;;; serial port instead of H89LDR2.ASM. All QUARTERSHIM does is unlock
+;;; the Floppy RAM and load the next 1024 bytes (which is this
+;;; program, ABSLDIR) from the serial port into addr 1400H and then
+;;; executes it.
+;;; 
+;;; ABSLDIR will read yet another program over the serial port and
+;;; execute it, similar to BOOTSTRP.ASM and QUARTERSHIM. The
+;;; difference is that the next file's data is expected to be prefixed
+;;; with an HDOS .ABS header. That allows the data to be loaded in any
+;;; address in the H89 which is important since the Z80 didn't have
+;;; proper position independent code. The ABS format also allows us to
+;;; send programs of any length (not just 818 bytes) and to jump to
+;;; any specified entry point when finished.
+;;; 
+;;; Since the incoming ABS file could be located anywhere in user RAM,
+;;; this program runs from floppy RAM so it doesn't tromp upon itself.
+
+;;; CREATING THE BIN FILE
+;;; For cross assembly, use asmx -l -e -b1400H -C8080 ABSLDIR.ASM
+
+;;; Version 0.4 December 21, 2025
+;;; -- Now loading correctly at ORG 1400H, however it no longer works!
+;;;    Handshaking problem?
+;;; Version 0.3 December 17, 2025
+;;; -- compile to ORG 1400H (Floppy RAM), presuming QUARTERSHIM will load us.
+;;; Version 0.2 December 14, 2025
+;;; -- read .ABS files directly using HDOS's 8-byte header.
+;;; Version 0.1 December 14, 2025
+;;; -- fixed up by b9 so it should actually work. Untested.
+;;; Version 0.0 December 14, 2025
+;;; -- major scaffolding from AI. Completely broken, but a start.
+;;; -- requires H8-4/H89/Z89.
+
+LP      EQU     0E0H 	; Base I/O address of 1st port on H-88-3 (340 Octal)
+RX      EQU     LP	; Received byte
+TX      EQU     LP	; Transmit byte
+LSTAT   EQU     LP+5	; Line Status: Bit 0 is set if data has arrived.
+
+FBEGIN	EQU	1400H		; Floppy RAM address
+FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
+
+DBGBUF	EQU	4000H		; Area to write flags showing progress.
+
+;;; This code lives in the Floppy RAM buffer which must be unlocked
+;;; before it can be written to. (See QUARTERSHIM.ASM).
+        ORG	FBEGIN	
+
+	LXI	H, DBGBUF	; Debugging
+	XRA	A
+	CALL	DEBUG
+
+;;;  Weirdly, the floppy starts up when I run this code. Is it because
+;;;  of where it is located in memory?
+
+	;; Relock the Floppy RAM. (Does this work?)
+	XRA	A
+	OUT	7FH
+
+	INR	A
+	CALL	DEBUG
+
+AWAIT:
+	CALL	CHRIN
+	CPI	'A'
+	JZ	AYAY
+        MVI	A,'?'		; Reply with '?': Whatchu talkin' bout, Willis?
+        CALL	CHROUT		;; h89trans.py sends '?' after sending , expects '?'.
+	JMP	AWAIT
+
+	;; h89trans.py sends 'A' before sending an ABS file, expects 'A'.
+AYAY:	
+
+	;; Reply with 'A': We're ready to receive an ABS file.
+        MVI	A,'A'
+        CALL	CHROUT
+	CALL	DEBUG
+
+	;; --- READ ABS HEADER --- 
+HDR:	CALL    CHRIN       ; Ignore first two bytes of .ABS file
+	CALL    CHRIN	    ; (TODO: Maybe halt execution if not FF00?)
+
+	CALL    CHRIN       ; Get Destination ADDR into DE
+        MOV     E,A
+        CALL    CHRIN
+        MOV     D,A
+
+        CALL    CHRIN       ; Get LENGTH into BC
+        MOV     C,A
+        CALL    CHRIN
+        MOV     B,A
+
+	CALL    CHRIN       ; Get Jump ADDR into HL
+        MOV     L,A
+        CALL    CHRIN
+        MOV     H,A
+
+	;; --- MAIN LOAD LOOP: Std 16-bit 8080 loop countdown ---
+LOOP:	CALL    CHRIN       ; Read byte from serial into A
+	STAX	D	    ; Store byte in destination (*DE)
+	INX	D	    ; Next memory location
+        DCX     B           ; Decrement LENGTH (BC) -- (Does not set Z-flag!)
+	MOV	A,B
+	ORA	C	    ; Are any bits of B or C set?
+	JNZ     LOOP	    ; Nope, so get the next byte
+	
+	;; Let h89ldr.py know that we've received the file
+        MVI	A,'A'
+        CALL	CHROUT
+
+	;; --- EXECUTE NEXT STAGE ---
+        PCHL                ; Jump to the received code's ENTRY address.
+	
+;;; --- SERIAL INPUT ROUTINE ---
+;;; (Presumes serial port already configured by Stage 0 loader.)
+CHRIN:	IN      LSTAT       ; Get serial port status 
+        RAR		    ; Put "ready" bit in Carry
+        JNC     CHRIN       ; Wait for char
+        IN      RX	    ; Read the byte into A
+	CALL	DEBUG
+        RET
+
+CHROUT: 
+        MOV 	D,A
+CHROT2: IN 	LSTAT
+        ANI 	60H		; Logical AND to get Transmitter Empty flags
+        CPI 	60H		; Is UART ready to send?
+        JNZ 	CHROT2
+        MOV 	A,D
+        OUT 	TX
+        RET
+
+DEBUG:	
+	MOV	M, A		; Debugging
+	INX	H		; Debugging
+	RET	
+
+;;; --- PAD GAP ---
+;;; QUARTERSHIM expects a file exactly 1K in length, so reserve extra bytes.
+PRGEND	DS	FBEGIN+FSIZE-PRGEND-1
+	NOP
+
+
+;;; NOTES
+
+;;; 1. Stack pointer is initialized to end of memory by MTR at power-on.
+
+;;; 2. CPU speed should not be an issue.
+;;;    a. At 9600 baud, a byte arrives approximately every 1 ms.
+;;;    b. Execution path from CHRIN to CHRIN is 54 T-states ≈ 0.027 ms.
+
+;;; 3. The DS assembler macro is used to bulk out this program to fill
+;;;    the 1K floppy buffer. This is so that future additions to this
+;;;    program will not require changes to QUARTERSHIM.

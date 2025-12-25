@@ -8,7 +8,7 @@
 ;;; execute it.
 
 ;;; I'm using Floppy RAM because it is the only place I know of that
-;;; will definitely not be clobbered when the next stage is HALFSHIM
+;;; will definitely not clobbered when the next stage is ABSLDR
 ;;; which can load up .ABS files to arbitrary locations in memory.
 
 ;;; CREATING THE BIN FILE
@@ -17,9 +17,9 @@
 ;;; USAGE
 ;;; After keying in BOOTSTRP.OCL, send the QUARTERSHIM binary from a PC:
 ;;; 	h8clxfer.py -l -f QUARTERSHIM.ASM.bin
-;;; Once QUARTERSHIM is running, one can send HALFSHIM into the floppy RAM:
-;;; 	h8clxfer.py -l -f HALFSHIM.ASM.bin
-;;; After sending HALFSHIM, send an ABS file to start it running:
+;;; Once QUARTERSHIM is running, one can send ABSLDR into the floppy RAM:
+;;; 	h8clxfer.py -l -f ABSLDR.ASM.bin
+;;; After sending ABSLDR, send an ABS file to start it running:
 ;;; 	h8clxfer.py -l -f GACTAGA.ABS
 
 ;;; NOTES FOR WRITING YOUR OWN NEXT STAGE
