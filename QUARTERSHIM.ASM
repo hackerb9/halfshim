@@ -74,13 +74,13 @@ LOOP:	CALL    GETCH       ; Read byte from serial into A
         ORA     C	    ; Are any bits of B or C set?
         JNZ     LOOP	    ; Get the next byte
 
-	;; Let h89trans.py know that we've arrived
-	MVI	A,'?'
-	CALL 	CHROUT
-
 	;; Relock the Floppy RAM
-	MVI	A,0
+	XRA	A
 	OUT	7FH
+
+	;; Let h89trans.py know that we've arrived
+	MVI	A,3FH		; 3F = '?'
+	CALL 	CHROUT
 
 	;; --- EXECUTE NEXT STAGE ---
         JMP	FBEGIN
