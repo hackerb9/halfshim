@@ -4,12 +4,12 @@
 ;;; After a user has keyed in Dwight Elvey's BOOTSTRP.ASM (Stage 0) at
 ;;; the Monitor, send this shim program from a host computer over the
 ;;; serial port instead of H89LDR2.ASM. It will unlock the Floppy
-;;; Drive RAM and load the next stage loader into that area and
+;;; Drive RAM, load the next stage loader into that area, and
 ;;; execute it.
 
-;;; I'm using Floppy RAM because it is the only place I know of that
-;;; will definitely not clobbered when the next stage is ABSLDR
-;;; which can load up .ABS files to arbitrary locations in memory.
+;;; Why Floppy RAM? If the next stage is ABSLDR, it will load up .ABS
+;;; files to arbitrary locations in memory. Floppy RAM is a safe place
+;;; for ABSLDR to live without worry that it will clobber itself.
 
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b2329H -C8080 QUARTERSHIM.ASM
@@ -26,7 +26,7 @@
 ;;; * Loads at 1400H to 17FFH
 ;;;   * ORG 1400H
 ;;;   * Exactly 1024 bytes long. (Use DS macro).
-;;; * If sent by h89ldr
+;;; * Can be sent to QUARTERSHIM using h89ldr.py's 'F'loppy-RAM command.
 
 ;;; Version 0.2 December 22, 2025
 ;;; -- Seems to work correctly. 
@@ -44,29 +44,39 @@ FBEGIN	EQU	1400H		; Floppy RAM address
 FEND	EQU	17FFH		; Last byte of RAM address
 FSIZE	EQU	FEND-FBEGIN+1	; Num bytes in Floppy RAM (1K)
 
+DBEND   EQU     265BH		; Data Block End address from BOOTSTRP.ASM
 
-DBEND   EQU     265BH	; Data Block End address from BOOTSTRP.ASM
-        ORG	2329H	; Matches with last byte of BOOTSTRP.ASM
+	;; ASCII character values for handshake.
+CHRQM	EQU	3FH		; '?' = 3FH
+CHRF	EQU	46H		; 'F' = 46H
+
+        ORG	2329H		; Matches with last byte of BOOTSTRP.ASM
 	DB	00H,00H,00H,00H,00H,00H,00H ; Actual code starts at 2330H
 
 ;;; To unlock the floppy RAM (1000H to 17FFH), set bit 7 of port 7F to 1. 
 ;;; (See table at end).
-	MVI	A,8FH
+	MVI	A,80H
 	OUT	7FH
 
-LDR:	
-	;; H89TRANS.COM and h89trans.py send 'A' after loading this stage.
-	CALL	GETCH
-	;; Reply with '?' which lets H89TRANS know we're alive.
-        MVI	A,3FH		; ord('?') = 3FH
+	;; H89TRANS will send 'A' to check if we're alive, expects '?'.
+
+	;; h89trans.py sends 'F' and waits for 'F' before sending the
+	;; next stage. It then waits for a 2nd 'F' to know we received it.
+COMMAND:
+	CALL	CHRIN
+	CPI	CHRF		; 'F' = 46H
+	JZ	QSHIM
+        MVI	A,CHRQM		; '?' = 3FH
         CALL	CHROUT
+	JMP	COMMAND
 
 QSHIM:	
-        LXI     D,FEND	; DE = Address to store next byte (counts down)
-	LXI	B,FSIZE	; BC = Length of program in bytss
+	CALL	CHROUT		; Send 'F' to let h89trans.py we're ready 
+        LXI     D,FEND		; DE = Address to store next byte (counts down)
+	LXI	B,FSIZE		; BC = Length of program in bytss
 
 	;; --- Standard 16-bit loop countdown ---
-LOOP:	CALL    GETCH       ; Read byte from serial into A
+LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	STAX	D	    ; Store byte in destination (*DE)
 	DCX	D	    ; Next memory location
 	DCX     B           ; Decrement LENGTH (BC) -- Does not set Z-flag!
@@ -74,12 +84,12 @@ LOOP:	CALL    GETCH       ; Read byte from serial into A
         ORA     C	    ; Are any bits of B or C set?
         JNZ     LOOP	    ; Get the next byte
 
-	;; Relock the Floppy RAM
+	;; Relock the Floppy RAM (OUT 7F, 0)
 	XRA	A
 	OUT	7FH
 
-	;; Let h89trans.py know that we've arrived
-	MVI	A,3FH		; 3F = '?'
+	;; Let h89trans.py know that we've received all the bytes
+	MVI	A,CHRF		; 'F' = 46H
 	CALL 	CHROUT
 
 	;; --- EXECUTE NEXT STAGE ---
@@ -87,9 +97,9 @@ LOOP:	CALL    GETCH       ; Read byte from serial into A
 
 ;;; --- SERIAL INPUT ROUTINE ---
 ;;; (Presumes serial port already configured by Stage 0 loader.)
-GETCH:	IN      LSTAT       ; Get serial port status 
+CHRIN:	IN      LSTAT       ; Get serial port status 
         RAR		    ; Put "ready" bit in Carry
-        JNC     GETCH       ; Wait for char
+        JNC     CHRIN       ; Wait for char
         IN      RX	    ; Read the byte into A
         RET
 
