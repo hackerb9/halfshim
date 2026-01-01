@@ -495,18 +495,21 @@ class H89Trans:
                 # last byte of BOOTSTRP.
 
                 # XXX Why did the original Forth code send 40 null bytes?
-                # 1. Because H89LDR2 always discards the first byte as "JUNK"?
-                #    Plausible. But why does H89LDR2 do that when
-                #    BOOTSTRP has already initialized the serial port?
+                # 
+                # 1. Give H89LDR2 time to initialize before receiving
+                #    commands? Possible, H89LDR2 does do some fancy
+                #    shifting of itself in memory when it first starts
+                #    up. When I eyeball it, it doesn't look anywhere
+                #    close to the 2000 T-states it'd need to take to
+                #    miss a byte. (9600bps is 1 ms per char, the H89's
+                #    clock period is 0.0005 ms. The slowest op is
+                #    `CALL` at 18 T-states.)
+                #    https://tobiasvl.github.io/optable//intel-8080/classic
                 #
-                # 2. Give H89LDR2 time to initialize before receiving
-                #    commands? Possible, but very unlikely since
-                #    9600bps is 1 ms per char, but the H89's clock
-                #    period is 0.0005 ms. It'd take 2000 T-states! No
-                #    instruction on the 8080 takes over 20 T-states,
-                #    so H89LDR2 would have to execute over 100
-                #    instructions to cause a timing glitch. To be
-                #    conservative, call that 50.
+                # 2. Maybe because H89LDR2 always discards the first
+                #    byte as "JUNK"? Plausible. But why does H89LDR2
+                #    do that when BOOTSTRP has already initialized the
+                #    serial port?
                 #
                 # 3. In case H89LDR2 was shorter than expected?
                 #    Implausible.
@@ -516,69 +519,6 @@ class H89Trans:
                 # Make sure the next stage loader is alive
                 self.ser.write(b'A')
                 # XXX Why did Forth xor '?' with 0x20 instead of straight?
-#                self.wait_char(chr(ord('?') ^ 0x20))
-                self.wait_char('?')
-                print("H89 Loader active and ready.")
-        except OSError as e:
-            print(f"Can't read Loader File '{filename}'?")
-            print(e)
-            return
-
-    def send_bytes_to_H89(self, bytes, handshake=None):
-        """A generic routine for sending any data to the H89 over the
-        serial port. Returns True is successful."""
-
-        if handshake:
-            if type(handshake) is str:
-                handshake=bytes(handshake, encoding='UTF-8')
-            self.ser.write(handshake)
-            self.wait_char(handshake)
-        try:
-            with open(filename, "rb") as f:
-                data = f.read()
-                file_size=len(data)
-                if file_size != ldr_size:
-                    print(f"Error: {filename} is {file_size} bytes, expected {ldr_size}.")
-                    return
-                else:
-                    print(f"Sending {filename} ({file_size} bytes)...")
-
-                # Send bytes in reverse-order to match Forth '1- dup c@'
-                for byte in reversed(data):
-                    # Check if H89 sent anything back
-                    if self.ser.in_waiting > 0:
-                        if self.ser.read(1) == b'?':
-                            print("\nAlready loaded?")
-                            return 
-                    # Send the next byte of the loader
-                    self.ser.write(bytes([byte]))
-
-                # At this point, the next loader should have started
-                # on the H89 as the final byte sent overwrites the
-                # last byte of BOOTSTRP.
-
-                # XXX Why did the original Forth code send 40 null bytes?
-                # 1. Because H89LDR2 always discards the first byte as "JUNK"?
-                #    Plausible. But why does H89LDR2 do that when
-                #    BOOTSTRP has already initialized the serial port?
-                #
-                # 2. Give H89LDR2 time to initialize before receiving
-                #    commands? Possible, but very unlikely since
-                #    9600bps is 1 ms per char, but the H89's clock
-                #    period is 0.0005 ms. It'd take 2000 T-states! No
-                #    instruction on the 8080 takes over 20 T-states,
-                #    so H89LDR2 would have to execute over 100
-                #    instructions to cause a timing glitch. To be
-                #    conservative, call that 50.
-                #
-                # 3. In case H89LDR2 was shorter than expected?
-                #    Implausible.
-
-                self.ser.write(b'\x00' * 40)
-
-                # Make sure the next stage loader is alive
-                self.ser.write(b'A')
-                # XXX Why did Forth xor '?' with 0x20?
 #                self.wait_char(chr(ord('?') ^ 0x20))
                 self.wait_char('?')
                 print("H89 Loader active and ready.")
