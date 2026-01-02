@@ -340,7 +340,8 @@ class H89Trans:
             self.fp = None
             print(f"\nRead Complete. Disk image saved in {fname}.")
             if self.read_errors:
-                print(f"\n  WARNING: {self.read_errors} Read Errors.\n")
+                print(f"\n  WARNING: {self.read_errors} "
+                      f"Read Error{s(self.read_errors)}.\n")
         except OSError as e:
             print(f"Error: Can't write '{filename}'?")
             print(e)
@@ -435,8 +436,8 @@ class H89Trans:
             return
 
 # XXX why is this failing?
-#        if not self.is_h89ldr2_alive():
-#            return
+        #if not self.is_h89ldr2_alive():
+        #    return
 
         print(f'Writing {self.fp.name} to the H89 floppy drive')
 
@@ -453,7 +454,6 @@ class H89Trans:
                 print(f"\rWriting Track {track}... ", end='', flush=True)
                 data = self.read_track_from_image()
                 self.ser.write(b'W')
-                #for byte in data: self.ser.write(bytes([byte]))
                 self.ser.write(bytes(data))
                 self.wait_char('W')
 
@@ -496,24 +496,21 @@ class H89Trans:
 
                 # XXX Why did the original Forth code send 40 null bytes?
                 # 
-                # 1. Give H89LDR2 time to initialize before receiving
-                #    commands? Possible, H89LDR2 does do some fancy
-                #    shifting of itself in memory when it first starts
-                #    up. When I eyeball it, it doesn't look anywhere
-                #    close to the 2000 T-states it'd need to take to
-                #    miss a byte. (9600bps is 1 ms per char, the H89's
-                #    clock period is 0.0005 ms. The slowest op is
-                #    `CALL` at 18 T-states.)
-                #    https://tobiasvl.github.io/optable//intel-8080/classic
-                #
-                # 2. Maybe because H89LDR2 always discards the first
-                #    byte as "JUNK"? Plausible. But why does H89LDR2
-                #    do that when BOOTSTRP has already initialized the
-                #    serial port?
-                #
-                # 3. In case H89LDR2 was shorter than expected?
-                #    Implausible.
+                # Current hypothesis: To give H89LDR2 time to
+                # initialize before receiving commands. H89LDR2 does
+                # some fancy shifting of itself in memory when it
+                # first starts up, which entails copying 1022 bytes in
+                # a loop that is 52 T-states long. The H89's clock
+                # period is 0.0005 ms.
 
+                # 52*1022*0.0005 = 26.572 ms.
+                # (Plus extra time for other instructions not in the loop.)
+                
+                # In comparison, 9600 bps is approx 1 ms per char, so
+                # sending 40 nulls will take 40 ms. That seems
+                # just about right. 
+
+                # https://tobiasvl.github.io/optable//intel-8080/classic
                 self.ser.write(b'\x00' * 40)
 
                 # Make sure the next stage loader is alive
@@ -672,6 +669,10 @@ def prtchr(c):
         return f'{c} ({o})'
     else:
         return ""
+
+def s(i:int) -> str:
+    '''Plural(s)'''
+    return "" if i == 1 else "s"
 
 def main():
 
