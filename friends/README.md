@@ -2,14 +2,28 @@
 
 This directory holds copies of related software. 
 
-* [H89LDR](H89LDR9)
+* [H89LDR](H89LDR9) and [BOOTSTRAP.OCL][BOOTSTRAP.OCL]
 * [h8clxfer][h8clxfer]
 * [HDOS Shim][hdosshim]
+
+## HDOS Shim
+
+[HDOS Shim][hdosshim] is an attempt to make .abs files which setup RAM
+as if HDOS was running and then return to ABSLDR.
 
 ## Dwight Elvey's H89LDR 
 
 This is a copy from Version 9 (2025). It may not be as up-to-date as
-from the original authors.
+from the original authors. 
+
+This directory contains [BOOTSTRAP.OCL][BOOTSTRAP.OCL] which ABSLDR
+needs to get started on an H89. It also contains H89TRANS.COM, but
+unlike h89trans.py, that program does not have the ability to send
+QUARTERSHIM or ABSLDR into H89's RAM.
+
+I used BOOTSTRAP.ASM and H89LDR2.ASM as references for creating
+QUARTERSHIM and ABSLDR. I used H89TRANS.SEQ as a reference for
+creating [h89trans.py][h89trans.py].
 
 ### Dwight Elvey's Stage-0 BOOTSTRP.ASM
 
@@ -43,11 +57,6 @@ to
   different version of dosbox is extraordinarily silly. Hopefully that
   is just a passing phase. 
   
-## HDOS Shim
-
-[HDOS Shim][hdosshim] is an attempt to make .abs files which setup RAM
-as if HDOS was running and then return to ABSLDR.
-
 ## Experimental update to h8clxfer.py
 
 Instead of using `H89TRANS.COM`, there is a Python program called
@@ -58,7 +67,10 @@ experimental update to Python 3 I've made:
 [h8clxfer.py][h8clxfer].
 
 Caveat: Be aware that h8clxfer.py seems to not use exactly the same
-protocol as Dwight Elvey's `H89TRANS.COM`. 
+protocol as Dwight Elvey's `H89TRANS.COM`. That is the reason I
+stopped updating it and switched to creating a more exact port,
+[h89trans.py][h89trans.py]
 
-[h8clxfer]: friends/h8clxfer.py
+[h8clxfer]: h8clxfer.py
+[h89trans.py]: ../h89trans.py
 
