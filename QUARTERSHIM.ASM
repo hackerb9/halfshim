@@ -4,8 +4,8 @@
 ;;; After a user has keyed in Dwight Elvey's BOOTSTRP.ASM (Stage 0) at
 ;;; the Monitor, send this shim program from a host computer over the
 ;;; serial port instead of H89LDR2.ASM. It will unlock the Floppy
-;;; Drive RAM, load the next stage loader into that area, and
-;;; execute it.
+;;; Drive RAM, wait for the letter 'F' over the serial port, load the
+;;; next stage loader into the Floppy RAM area, and execute it.
 
 ;;; Why Floppy RAM? If the next stage is ABSLDR, it will load up .ABS
 ;;; files to arbitrary locations in memory. Floppy RAM is a safe place
@@ -14,15 +14,17 @@
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b2329H -C8080 QUARTERSHIM.ASM
 
-;;; USAGE
+;;; USAGE from the h89trans.py program
 ;;; After keying in BOOTSTRP.OCL, send the QUARTERSHIM binary from a PC:
-;;; 	h8clxfer.py -l -f QUARTERSHIM.ASM.bin
+;;; 	type 'Q' to send QUARTERSHIM.BIN
 ;;; Once QUARTERSHIM is running, one can send ABSLDR into the floppy RAM:
-;;; 	h8clxfer.py -l -f ABSLDR.ASM.bin
+;;; 	type 'F' to send ABSLDR.BIN
 ;;; After sending ABSLDR, send an ABS file to start it running:
-;;; 	h8clxfer.py -l -f GACTAGA.ABS
+;;; 	type 'O' to open an ABS file
+;;; 	type 'GACTAGA.ABS' (the ABS filename to send) and hit Enter
+;;; 	type 'A' to send it to ABSLDR.
 
-;;; NOTES FOR WRITING YOUR OWN NEXT STAGE
+;;; NOTES FOR WRITING YOUR OWN NEXT STAGE (instead of ABSLDR)
 ;;; * Loads at 1400H to 17FFH
 ;;;   * ORG 1400H
 ;;;   * Exactly 1024 bytes long. (Use DS macro).
@@ -38,6 +40,11 @@
 LP      EQU     0E0H 	; Base I/O address of 1st port on H-88-3 (340 Octal)
 RX      EQU     LP	; Receive buffer 
 TX	EQU	LP	; Transmit buffer
+DVL     EQU     LP
+DVH     EQU     LP+1
+IER     EQU     LP+1
+LCNTL   EQU     LP+3
+MCNTL   EQU     LP+4
 LSTAT   EQU     LP+5	; Line Status: Bit 0 is set if data has arrived.
 
 FBEGIN	EQU	1400H		; Floppy RAM address
@@ -45,10 +52,6 @@ FEND	EQU	17FFH		; Last byte of RAM address
 FSIZE	EQU	FEND-FBEGIN+1	; Num bytes in Floppy RAM (1K)
 
 DBEND   EQU     265BH		; Data Block End address from BOOTSTRP.ASM
-
-	;; ASCII character values for handshake.
-CHRQM	EQU	3FH		; '?' = 3FH
-CHRF	EQU	46H		; 'F' = 46H
 
         ORG	2329H		; Matches with last byte of BOOTSTRP.ASM
 	DB	00H,00H,00H,00H,00H,00H,00H ; Actual code starts at 2330H
@@ -58,15 +61,18 @@ CHRF	EQU	46H		; 'F' = 46H
 	MVI	A,80H
 	OUT	7FH
 
+	;; If Shift+Reset was hit, serial port needs to be reconfigured.
+	CALL	SINT
+
 	;; H89TRANS will send 'A' to check if we're alive, expects '?'.
 
 	;; h89trans.py sends 'F' and waits for 'F' before sending the
 	;; next stage. It then waits for a 2nd 'F' to know we received it.
 COMMAND:
 	CALL	CHRIN
-	CPI	CHRF		; 'F' = 46H
+	CPI	'F'		; 'F' = 46H
 	JZ	QSHIM
-        MVI	A,CHRQM		; '?' = 3FH
+        MVI	A,'?'		; '?' = 3FH
         CALL	CHROUT
 	JMP	COMMAND
 
@@ -89,7 +95,7 @@ LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	OUT	7FH
 
 	;; Let h89trans.py know that we've received all the bytes
-	MVI	A,CHRF		; 'F' = 46H
+	MVI	A,'F'		; 'F' = 46H
 	CALL 	CHROUT
 
 	;; --- EXECUTE NEXT STAGE ---
@@ -111,6 +117,23 @@ CHROT2: IN 	LSTAT
         JNZ 	CHROT2
         MOV 	A,D
         OUT 	TX
+        RET
+
+SINT:  ; For H8-4 and H89 with LP
+        XRA A
+        Out LCNTL      ; LINE CONTROL
+        OUT IER        ; NO INTERRUPTS
+        OUT MCNTL      ; INIT MODEM CONTROL
+        DCR A           ; SHOULD BE 'MVI A, 80H' BUT 0FFH OK
+        OUT LCNTL
+        MVI A, 0CH      ; 9600 BAUD
+        OUT DVL
+        XRA A
+        OUT DVH
+        MVI A, 07H      ; 8 BIT 2 STOPS
+        OUT LCNTL
+        IN LSTAT
+        IN RX           ; CLEAR ANY JUNK
         RET
 
 ;;; --- PAD GAP ---

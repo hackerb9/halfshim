@@ -60,6 +60,11 @@
 LP      EQU     0E0H 	; Base I/O address of 1st port on H-88-3 (340 Octal)
 RX      EQU     LP	; Received byte
 TX      EQU     LP	; Transmit byte
+DVL     EQU     LP
+DVH     EQU     LP+1
+IER     EQU     LP+1
+LCNTL   EQU     LP+3
+MCNTL   EQU     LP+4
 LSTAT   EQU     LP+5	; Line Status: Bit 0 is set if data has arrived.
 
 FBEGIN	EQU	1400H		; Floppy RAM address
@@ -72,32 +77,28 @@ DBGBUF	EQU	4000H		; Area to write flags showing progress.
         ORG	FBEGIN	
 
 	LXI	H, DBGBUF	; Debugging
-	XRA	A
+	MOV	A, L
 	CALL	DEBUG
+
+	;; If Shift+Reset was hit, serial port needs to be reconfigured.
+	CALL	SINT
 
 ;;;  Weirdly, the floppy starts up when I run this code. Is it because
 ;;;  of where it is located in memory?
 
-	;; Relock the Floppy RAM. (Does this work?)
-	XRA	A
-	OUT	7FH
-
-	INR	A
-	CALL	DEBUG
-
 AWAIT:
 	CALL	CHRIN
-	CPI	'A'
-	JZ	AYAY
+	CPI	'B'		; Is it 'B'?
+	JZ	ABSLDR
         MVI	A,'?'		; Reply with '?': Whatchu talkin' bout, Willis?
-        CALL	CHROUT		;; h89trans.py sends '?' after sending , expects '?'.
+        CALL	CHROUT
 	JMP	AWAIT
 
-	;; h89trans.py sends 'A' before sending an ABS file, expects 'A'.
-AYAY:	
+	;; h89trans.py sends 'B' before sending an ABS file, expects 'B'.
+ABSLDR:	
 
-	;; Reply with 'A': We're ready to receive an ABS file.
-        MVI	A,'A'
+	;; Reply with 'B': We're ready to receive an ABS file.
+        MVI	A,'B'
         CALL	CHROUT
 	CALL	DEBUG
 
@@ -130,7 +131,7 @@ LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	JNZ     LOOP	    ; Nope, so get the next byte
 	
 	;; Let h89ldr.py know that we've received the file
-        MVI	A,'A'
+        MVI	A,'B'
         CALL	CHROUT
 
 	;; --- EXECUTE NEXT STAGE ---
@@ -153,6 +154,23 @@ CHROT2: IN 	LSTAT
         JNZ 	CHROT2
         MOV 	A,D
         OUT 	TX
+        RET
+
+SINT:  ; For H8-4 and H89 with LP
+        XRA A
+        Out LCNTL      ; LINE CONTROL
+        OUT IER        ; NO INTERRUPTS
+        OUT MCNTL      ; INIT MODEM CONTROL
+        DCR A           ; SHOULD BE 'MVI A, 80H' BUT 0FFH OK
+        OUT LCNTL
+        MVI A, 0CH      ; 9600 BAUD
+        OUT DVL
+        XRA A
+        OUT DVH
+        MVI A, 07H      ; 8 BIT 2 STOPS
+        OUT LCNTL
+        IN LSTAT
+        IN RX           ; CLEAR ANY JUNK
         RET
 
 DEBUG:	
