@@ -181,8 +181,8 @@ class H89Trans:
                 if raw.upper() == target:
                     break
                 else:
-                    print(f'wait_char: Waiting for {prtchr(target)}, '
-                          f'got {prtchr(raw)}', flush=True)
+                    print(f"wait_char: Waiting for {prtchr(target)}, "
+                          f"got {prtchr(raw)}", flush=True)
 
             except serial.SerialException:
                 print("\nConnection lost during wait_char."); return
@@ -480,6 +480,12 @@ class H89Trans:
                 else:
                     print(f"Sending {filename} ({file_size} bytes)...")
 
+                if self.ser.in_waiting > 0:
+                    print('Flushing serial input: ', end='')
+                    while self.ser.in_waiting > 0:
+                        print(prtchr(self.ser.read(1)), end='')
+                    print()
+
                 # Send bytes in reverse-order to match Forth '1- dup c@'
                 for byte in reversed(data):
                     # Check if H89 sent anything back
@@ -493,24 +499,6 @@ class H89Trans:
                 # At this point, the next loader should have started
                 # on the H89 as the final byte sent overwrites the
                 # last byte of BOOTSTRP.
-
-                # XXX Why did the original Forth code send 40 null bytes?
-                # 
-                # Current hypothesis: To give H89LDR2 time to
-                # initialize before receiving commands. H89LDR2 does
-                # some fancy shifting of itself in memory when it
-                # first starts up, which entails copying 1022 bytes in
-                # a loop that is 52 T-states long. The H89's clock
-                # period is 0.0005 ms.
-
-                # 52*1022*0.0005 = 26.572 ms.
-                # (Plus extra time for other instructions not in the loop.)
-                
-                # In comparison, 9600 bps is approx 1 ms per char, so
-                # sending 40 nulls will take 40 ms. That seems
-                # just about right. 
-
-                # https://tobiasvl.github.io/optable//intel-8080/classic
                 self.ser.write(b'\x00' * 40)
 
                 # Make sure the next stage loader is alive
@@ -521,6 +509,37 @@ class H89Trans:
                 print("H89 Loader active and ready.")
         except OSError as e:
             print(f"Can't read Loader File '{filename}'?")
+            print(e)
+            return
+
+    def write_absloader(self, filename="ABSLDR.BIN"):
+        """Experimental! If QUARTERSHIM is loaded, try sending ABSLDR into the H89's Floppy RAM"""
+        try:
+            actual_size = os.path.getsize(filename)
+            if actual_size != 1024:
+                print(f'ERROR: Size of "{filename}" was {actual_size} bytes. Should be 1024.', file=sys.stderr)
+                return False
+            # Make sure QUARTERSHIM is running
+            # At this point, the next loader should have started
+            # on the H89 as the final byte sent overwrites the
+            # last byte of BOOTSTRP.
+            self.ser.write(b'F')
+            print('Checking if QUARTERSHIM is running on H89... ', end='', flush=True)
+            # This rules out H89LDR2 which will respond '?'
+            self.wait_char('F')
+            print('All good.')
+
+            print(f"\rSending {filename} to H89... ", end='', flush=True)
+            with open(filename, 'rb') as fp:
+                data=fp.read()
+                self.ser.write(bytes(reversed(data)))
+                print(f"{len(data)} bytes sent")
+                print('Awaiting confirmation from H89... ', end='', flush=True)
+                self.wait_char('F') 
+                print('Confirmed.')
+
+        except OSError as e:
+            print(f"Problem reading '{filename}'?")
             print(e)
             return
 
@@ -565,10 +584,11 @@ class H89Trans:
                 return 1
 
             # Make sure ABSLDR is running
-            self.ser.write(b'F')
-            print('Checking if ABSLDR is running on H89... ', end='', flush=True)
+            print('Checking if ABSLDR is running on H89... ',
+                  end='', flush=True)
+            self.ser.write(b'B')
             # This rules out H89LDR2 which will respond '?'
-            self.wait_char(chr(ord('F') ))
+            self.wait_char('B')
             print('All good.')
 
             self.fp.seek(0)
@@ -578,7 +598,7 @@ class H89Trans:
             self.ser.write(bytes(data))
             print(f"{len(data)} bytes sent")
             print('Awaiting confirmation from H89... ', end='', flush=True)
-            self.wait_char(chr(ord('A') ))
+            self.wait_char('B')
             print('Confirmed.')
 
         except OSError as e:
@@ -634,7 +654,7 @@ class H89Trans:
         # XXX To do: show these in the menu
         elif choice == 'P': self.pp()
         elif choice == 'Q': self.write_loader('QUARTERSHIM.BIN')
-        elif choice == 'F': self.send_to_fram('ABSLDR.BIN', self.FSIZE)
+        elif choice == 'F': self.write_absloader('ABSLDR.BIN')
         elif choice == 'A': self.send_abs()
 
         elif choice == 'X' or choice == '\x1B': 
@@ -665,8 +685,10 @@ def prtchr(c):
     if c:
         o = f'{ord(c):02X}H'
         if type(c) is bytes:  c = c.decode(errors='ignore')
-        if not c.isprintable():  c = ""
-        return f'{c} ({o})'
+        if c.isprintable():  
+            return f"'{c}' ({o})"
+        else:
+            return f"({o})"
     else:
         return ""
 
