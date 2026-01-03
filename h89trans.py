@@ -623,7 +623,6 @@ class H89Trans:
             self.wait_char('B')
             print('All good.')
 
-            self.fp.seek(0)
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
             data = self.fp.read()
 
