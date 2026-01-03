@@ -70,15 +70,9 @@ LSTAT   EQU     LP+5	; Line Status: Bit 0 is set if data has arrived.
 FBEGIN	EQU	1400H		; Floppy RAM address
 FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 
-DBGBUF	EQU	4000H		; Area to write flags showing progress.
-
 ;;; This code lives in the Floppy RAM buffer which must be unlocked
 ;;; before it can be written to. (See QUARTERSHIM.ASM).
         ORG	FBEGIN	
-
-	LXI	H, DBGBUF	; Debugging
-	MOV	A, L
-	CALL	DEBUG
 
 	;; If Shift+Reset was hit, serial port needs to be reconfigured.
 	CALL	SINT
@@ -100,7 +94,6 @@ ABSLDR:
 	;; Reply with 'B': We're ready to receive an ABS file.
         MVI	A,'B'
         CALL	CHROUT
-	CALL	DEBUG
 
 	;; --- READ ABS HEADER --- 
 HDR:	CALL    CHRIN       ; Ignore first two bytes of .ABS file
@@ -143,7 +136,6 @@ CHRIN:	IN      LSTAT       ; Get serial port status
         RAR		    ; Put "ready" bit in Carry
         JNC     CHRIN       ; Wait for char
         IN      RX	    ; Read the byte into A
-	CALL	DEBUG
         RET
 
 CHROUT: 
@@ -172,11 +164,6 @@ SINT:  ; For H8-4 and H89 with LP
         IN LSTAT
         IN RX           ; CLEAR ANY JUNK
         RET
-
-DEBUG:	
-	MOV	M, A		; Debugging
-	INX	H		; Debugging
-	RET	
 
 ;;; --- PAD GAP ---
 ;;; QUARTERSHIM expects a file exactly 1K in length, so reserve extra bytes.
