@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 
-# Based on Dwight Elvey's H89TRANS.SEQ
+# Based on Dwight Elvey's H89TRANS.SEQ from H89LDR version 9.
 
-# v 2.0 Adding support for communicating with QUARTERSHIM and ABSLDR. 
+# v 2.0 Support for communicating with QUARTERSHIM and ABSLDR.
 # v 1.0 This is a one-to-one port from Forth to Python by hackerb9.
 
 # It should work almost identically to H89TRANS.COM as it is nearly
@@ -35,8 +35,8 @@
 
 # --b9 December 2025
 
-# License is the same as whatever Dwight originally used,
-# falling back to the MIT License if necessary.
+# License is the same as whatever Dwight used, or is using currently,
+# or the GNU GPL v3+, at your option.
 
 import serial
 import serial.tools.list_ports
