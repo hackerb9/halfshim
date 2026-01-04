@@ -509,14 +509,9 @@ class H89Trans:
                 if file_size != ldr_size:
                     print(f"Error: {filename} is {file_size} bytes, expected {ldr_size}.")
                     return
-                else:
-                    print(f"Sending {filename} ({file_size} bytes)...")
 
-                if self.ser.in_waiting > 0:
-                    print('Flushing serial input: ', end='')
-                    while self.ser.in_waiting > 0:
-                        print(prtchr(self.ser.read(1)), end='')
-                    print()
+                manual_flush(self.ser)
+                print(f"Sending {filename} ({file_size} bytes)...")
 
                 # Send bytes in reverse-order to match Forth '1- dup c@'
                 for byte in reversed(data):
@@ -532,6 +527,7 @@ class H89Trans:
                 # on the H89 as the final byte sent overwrites the
                 # last byte of BOOTSTRP.
                 self.ser.write(b'\x00' * 40)
+                manual_flush(self.ser) 			# Discard any responses
 
                 # Make sure the next stage loader is alive
                 self.ser.write(b'A')
@@ -616,21 +612,25 @@ class H89Trans:
                 return 1
 
             # Make sure ABSLDR is running
-            print('Checking if ABSLDR is running on H89... ',
-                  end='', flush=True)
+            manual_flush(self.ser)
+            print('Checking if ABSLDR is running on H89... ', end='', flush=True)
             self.ser.write(b'B')
             # This rules out H89LDR2 which will respond '?'
             self.wait_char('B')
             print('All good.')
 
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
+            self.fp.seek(0)
             data = self.fp.read()
-
             self.ser.write(bytes(data))
+
             print(f"{len(data)} bytes sent")
             print('Awaiting confirmation from H89... ', end='', flush=True)
             self.wait_char('B')
             print('Confirmed.')
+
+            if entry == self.FBEGIN:
+                print('H89 control returned to ABSLDR.')
 
         except OSError as e:
             print(f"Problem reading '{self.fp.name}'?")
@@ -711,19 +711,30 @@ def split_octal(i):
         raise OverflowError('Split octal can only represent numbers from 0 to 65535') 
     print( f'{i//256:03o} {i%256:03o}' )
 
-def prtchr(c):
+def manual_flush(ser:serial.Serial):
+    '''Discard serial input, but show it so we know what's going on.'''
+    if not ser or not ser.is_open: return
+    if ser.in_waiting > 0:
+        print('Flushing serial input: ', end='')
+        while ser.in_waiting > 0:
+            print(prtchr(ser.read(ser.in_waiting)), end='. ')
+        print()
+
+def prtchr(k:str):
     '''Given a character k, return a printable string for it, if
-    possible, including its hex value. A -> "A" (41H)
+    possible. If not possible, show its hex value: '\b' -> (08H).
+    If k is multiple characters, show each one separated by commas.
     '''
-    if c:
+    rv=[]
+    for c in k:
         o = f'{ord(c):02X}H'
         if type(c) is bytes:  c = c.decode(errors='ignore')
         if c.isprintable():  
-            return f"'{c}' ({o})"
+            rv.append( f"{c}" )
         else:
-            return f"({o})"
-    else:
-        return ""
+            rv.append( f"({o})" )
+
+    return ", ".join(rv)
 
 def s(i:int) -> str:
     '''Plural(s)'''
