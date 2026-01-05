@@ -1,24 +1,57 @@
 ;;; STAGE 1/2 SHIM LOADER by Hackerb9.
+;;; Loads .ABS files from the serial port without booting from floppy.
 ;;; 
-;;; Expects an 8 byte header similar to HDOS's .ABS format
+;;; Protocol is based on and compatible with Dwight Elvey's H89LDR.
 ;;; 
+;;; | PC |		| H89 |			MEANING
+;;;         'A' -->				PC: Are you alive?
+;;;            <-- '?'     			H89: Yes, I am.
+;;;         'B' -->     			PC: Ready for an ABS file?
+;;;            <-- 'B'     			H89: Now receiving ABS file.
+;;;         FFH --> 				PC: Magic: "Binary type"
+;;;         00H --> 				PC: Magic: "ABS object"
+;;;      ADDR L --> 				PC: Load the following program
+;;;      ADDR H --> 				    into this memory address.
+;;;    LENGTH L -->				PC: You will receive this many
+;;;    LENGTH H -->				    bytes after the header.
+;;;     ENTRY L -->				PC: When done, jump
+;;;     ENTRY H -->				    to this location.
+;;;        data -->				PC: Here's the .ABS file
+;;;        ...					    ...
+;;;        data -->
+;;;            <-- 'B'				H89: LENGTH bytes received. 
+;;; 					 	     I'm jumping to ENTRY.
+;;; | PC |		| H89 |			MEANING
+
+
+;;; Note that the 8 byte header is intended to be identical to HDOS's
+;;; .ABS format, but of course you can load any arbitrary data you
+;;; wish by prefixing it with the proper header.
+
 ;;; 	0: FFH	(binary type)
 ;;; 	1: 00H  (ABS object)
-;;; 	2: ADDR L
-;;; 	3: ADDR H
-;;; 	4: LENGTH L
-;;; 	5: LENGTH H
-;;; 	6: ENTRYPOINT L
-;;; 	7: ENTRYPOINT H
+;;; 	2: ADDR Low
+;;; 	3: ADDR High
+;;; 	4: LENGTH Low
+;;; 	5: LENGTH High
+;;; 	6: ENTRYPOINT Low
+;;; 	7: ENTRYPOINT High
 ;;; 
-;;; Places received data starting at ADDR and then jumps to ENTRYPOINT.
+;;; Receives LENGTH bytes of data, places it starting at ADDR
+;;; (increasing), and then jumps to ENTRYPOINT.
+;;; 
+;;; To load more than one ABS file in memory, change the ENTRYPOINT to
+;;; 1400H for all files but the last. 1400H (024,000A) is the Floppy
+;;; Drive RAM and where ABSLDR is stored by QUARTERSHIM. 
 
-;;; SHORT USAGE:
+;;; SHORT USAGE via h89trans.py
 ;;; 
-;;; 	h8clxfer.py -l -f QUARTERSHIM.ASM.bin
-;;; 	h8clxfer.py -l -f ABSLDIR.ASM.bin
-;;; After sending ABSLDIR, send an ABS file to start it running:
-;;; 	h8clxfer.py -l -f GACTAGA.ABS
+;;;  Press 'Q' to send QUARTERSHIM.BIN to BOOTSTRP
+;;;  Press 'F' to send ABSLDR.BIN to QUARTERSHIM
+;;;  Press 'O' to select an ABS file (e.g., GACTAGA.ABS)
+;;;  Press 'A' to send it to ABSLDR and start it running
+
+
 
 ;;; USAGE EXPLANATION:
 ;;; 
@@ -44,6 +77,8 @@
 ;;; CREATING THE BIN FILE
 ;;; For cross assembly, use asmx -l -e -b1400H -C8080 ABSLDIR.ASM
 
+;;; Version 0.5 January 5, 2026
+;;; -- Seems to be working! Needs further testing, documentation.
 ;;; Version 0.4 December 21, 2025
 ;;; -- Now loading correctly at ORG 1400H, however it no longer works!
 ;;;    Handshaking problem?
