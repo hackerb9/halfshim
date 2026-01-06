@@ -112,9 +112,6 @@ FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 	;; If Shift+Reset was hit, serial port needs to be reconfigured.
 	CALL	SINT
 
-;;; XXX Weirdly, the floppy starts up when I run this code. Is it
-;;; because of where it is located in memory?
-
 AWAIT:
 	;; h89trans.py sends 'B' before sending an ABS file, expects 'B'.
 	CALL	CHRIN

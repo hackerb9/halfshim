@@ -615,7 +615,7 @@ class H89Trans:
             self.ser.write(b'B')
             # This rules out H89LDR2 which will respond '?'
             self.wait_char('B')
-            print('All good.')
+            print('OK.')
 
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
             self.fp.seek(0)
@@ -724,9 +724,9 @@ def prtchr(k:str):
     If k is multiple characters, show each one separated by commas.
     '''
     rv=[]
+    if type(k) is bytes:  k = k.decode(errors='ignore')
     for c in k:
         o = f'{ord(c):02X}H'
-        if type(c) is bytes:  c = c.decode(errors='ignore')
         if c.isprintable():  
             rv.append( f"{c}" )
         else:
