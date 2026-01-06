@@ -510,7 +510,6 @@ class H89Trans:
                     print(f"Error: {filename} is {file_size} bytes, expected {ldr_size}.")
                     return
 
-                manual_flush(self.ser)
                 print(f"Sending {filename} ({file_size} bytes)...")
 
                 # Send bytes in reverse-order to match Forth '1- dup c@'
@@ -612,7 +611,6 @@ class H89Trans:
                 return 1
 
             # Make sure ABSLDR is running
-            manual_flush(self.ser)
             print('Checking if ABSLDR is running on H89... ', end='', flush=True)
             self.ser.write(b'B')
             # This rules out H89LDR2 which will respond '?'
@@ -745,7 +743,6 @@ def main():
     """Command: Configure port, show menu, execute commands""" 
     h = None
     try:
-        assert ('foo')
         h = H89Trans()
         h.select_port()
         while True:
@@ -766,7 +763,7 @@ def main():
             if os.path.getsize(h.fp.name) == 0:
                 print(f'Removing empty file "{h.fp.name}"')
                 os.unlink(h.fp.name)
-        exit(0)
+    exit(0)
 
 if __name__ == "__main__":
     main()
