@@ -188,8 +188,8 @@ class H89Trans:
                 if raw.upper() == target:
                     break
                 else:
-                    print(f"wait_char: Waiting for {prtchr(target)}, "
-                          f"got {prtchr(raw)}", flush=True)
+                    print(f"[want {prtchr(target)}, got {prtchr(raw)}] ",
+                          end='', flush=True)
 
             except serial.SerialException:
                 print("\nConnection lost during wait_char."); return
@@ -581,17 +581,19 @@ class H89Trans:
             print('  Please Open an existing ABS file to send first.')
             return
 
-        print(f'File size: {os.path.getsize(self.fp.name)}')
         try:
             self.fp.seek(0)
-            s = self.fp.read(8)
+            data = self.fp.read()
+            filesize = len(data)
             import struct
-            (magic, addr, length, entry) = struct.unpack('<HHHH', s)
+            (magic, addr, length, entry) = struct.unpack('<HHHH', data[0:8])
             print(f'Magic: {magic:04X}H, '
                   f'Load Addr: {addr:04X}H, '
                   f'Length: {length:04X}H, '
                   f'Entry: {entry:04X}') 
             endaddr=addr+length
+            if length+8 > filesize:
+                print(f'\n    ERROR: file has only {(filesize):04X}H bytes of data!\n')
             if endaddr > 0xFFFF:
                 print('\n    WARNING: This writes beyond 64K of RAM!\n')
             if addr <= self.FEND and endaddr >= self.FBEGIN:
@@ -609,6 +611,8 @@ class H89Trans:
                 print('\n    ERROR: {self.fp.name} is not an ABS file!')
                 print(  '           Magic should be 00FFH, not {magic:04X}H\n')
                 return 1
+            if length+8 < filesize:
+                print(f'\n    NOTE: Omitting {(filesize-8-length):04X}H excess bytes from file of size {filesize:04X}.\n')
 
             # Make sure ABSLDR is running
             print('Checking if ABSLDR is running on H89... ', end='', flush=True)
@@ -618,11 +622,18 @@ class H89Trans:
             print('OK.')
 
             print(f"\rSending {self.fp.name} to H89... ", end='', flush=True)
-            self.fp.seek(0)
-            data = self.fp.read()
-            self.ser.write(bytes(data))
+#            written = self.ser.write(bytes(data[0:length+8]))
+            written=0
+            for byte in data[0:length+8]:
+                # Check if H89 sent anything back
+                if self.ser.in_waiting > 0:
+                    s = self.ser.read(self.ser.in_waiting)
+                    print(f"\nError! H89 unexpectedly said {prtchr(s)}")
+                    return 
+                # Send the next byte of the loader
+                written += self.ser.write(bytes([byte]))
 
-            print(f"{len(data)} bytes sent")
+            print(f"{written} bytes sent")
             print('Awaiting confirmation from H89... ', end='', flush=True)
             self.wait_char('B')
             print('Confirmed.')
@@ -724,14 +735,16 @@ def prtchr(k:str):
     If k is multiple characters, show each one separated by commas.
     '''
     rv=[]
-    if type(k) is bytes:  k = k.decode(errors='ignore')
-    for c in k:
-        o = f'{ord(c):02X}H'
-        if c.isprintable():  
-            rv.append( f"{c}" )
+#    if type(k) is bytes:  k = k.decode(errors='ignore')
+    if type(k) is str:
+        k = bytes(k, encoding='UTF-8')
+    for x in k:
+        c = chr(x)
+        o = f'{x:02X}H'
+        if c.isprintable():
+            rv.append( f"'{c}' ({o})" )
         else:
             rv.append( f"({o})" )
-
     return ", ".join(rv)
 
 def s(i:int) -> str:
