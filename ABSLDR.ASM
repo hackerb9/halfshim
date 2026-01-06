@@ -112,27 +112,26 @@ FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 	;; If Shift+Reset was hit, serial port needs to be reconfigured.
 	CALL	SINT
 
-;;;  Weirdly, the floppy starts up when I run this code. Is it because
-;;;  of where it is located in memory?
+;;; XXX Weirdly, the floppy starts up when I run this code. Is it
+;;; because of where it is located in memory?
 
 AWAIT:
+	;; h89trans.py sends 'B' before sending an ABS file, expects 'B'.
 	CALL	CHRIN
 	CPI	'B'		; Is it 'B'?
-	JZ	ABSLDR
-        MVI	A,'?'		; Reply with '?': Whatchu talkin' bout, Willis?
+	JZ	ABSLDR		; Yes, we can move forward.
+        MVI	A,'?'		; Nope, reply with '?'.
         CALL	CHROUT
 	JMP	AWAIT
 
-	;; h89trans.py sends 'B' before sending an ABS file, expects 'B'.
 ABSLDR:	
-
 	;; Reply with 'B': We're ready to receive an ABS file.
         MVI	A,'B'
         CALL	CHROUT
 
 	;; --- READ ABS HEADER --- 
 HDR:	CALL    CHRIN       ; Ignore first two bytes of .ABS file
-	CALL    CHRIN	    ; (TODO: Maybe halt execution if not FF00?)
+	CALL    CHRIN	    ; (XXX TODO: Maybe halt execution if not FF00?)
 
 	CALL    CHRIN       ; Get Destination ADDR into DE
         MOV     E,A
@@ -144,7 +143,7 @@ HDR:	CALL    CHRIN       ; Ignore first two bytes of .ABS file
         CALL    CHRIN
         MOV     B,A
 
-	CALL    CHRIN       ; Get Jump ADDR into HL
+	CALL    CHRIN       ; Get ENTRY (jump) ADDR into HL
         MOV     L,A
         CALL    CHRIN
         MOV     H,A
@@ -165,8 +164,7 @@ LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	;; --- EXECUTE NEXT STAGE ---
         PCHL                ; Jump to the received code's ENTRY address.
 	
-;;; --- SERIAL INPUT ROUTINE ---
-;;; (Presumes serial port already configured by Stage 0 loader.)
+;;; --- SERIAL I/O ROUTINES ---
 CHRIN:	IN      LSTAT       ; Get serial port status 
         RAR		    ; Put "ready" bit in Carry
         JNC     CHRIN       ; Wait for char
@@ -185,19 +183,19 @@ CHROT2: IN 	LSTAT
 
 SINT:  ; For H8-4 and H89 with LP
         XRA A
-        Out LCNTL      ; LINE CONTROL
-        OUT IER        ; NO INTERRUPTS
-        OUT MCNTL      ; INIT MODEM CONTROL
-        DCR A           ; SHOULD BE 'MVI A, 80H' BUT 0FFH OK
+        Out LCNTL		; LINE CONTROL
+        OUT IER			; NO INTERRUPTS
+        OUT MCNTL		; INIT MODEM CONTROL
+        DCR A			; SHOULD BE 'MVI A, 80H' BUT 0FFH OK
         OUT LCNTL
-        MVI A, 0CH      ; 9600 BAUD
+        MVI A, 0CH		; 9600 BAUD
         OUT DVL
         XRA A
         OUT DVH
-        MVI A, 07H      ; 8 BIT 2 STOPS
+        MVI A, 07H		; 8 BIT 2 STOPS
         OUT LCNTL
         IN LSTAT
-        IN RX           ; CLEAR ANY JUNK
+        IN RX			; CLEAR ANY JUNK
         RET
 
 ;;; --- PAD GAP ---
