@@ -612,7 +612,7 @@ class H89Trans:
                 print(  '           Magic should be 00FFH, not {magic:04X}H\n')
                 return 1
             if length+8 < filesize:
-                print(f'\n    NOTE: Omitting {(filesize-8-length):04X}H excess bytes from file of size {filesize:04X}.\n')
+                print(f'    NOTE: Omitting {(filesize-8-length):04X}H excess bytes from file of size {filesize:04X}.\n')
 
             # Make sure ABSLDR is running
             print('Checking if ABSLDR is running on H89... ', end='', flush=True)
