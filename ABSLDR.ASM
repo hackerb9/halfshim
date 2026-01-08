@@ -21,7 +21,7 @@
 ;;;        data -->
 ;;;            <-- 'B'				H89: LENGTH bytes received. 
 ;;; 					 	     I'm jumping to ENTRY.
-;;; | PC |		| H89 |			MEANING
+;;; | PC |		| H89 |
 
 
 ;;; Note that the 8 byte header is intended to be identical to HDOS's
@@ -105,12 +105,20 @@ LSTAT   EQU     LP+5	; Line Status: Bit 0 is set if data has arrived.
 FBEGIN	EQU	1400H		; Floppy RAM address
 FSIZE	EQU	1800H-FBEGIN	; Num bytes in Floppy RAM (1K)
 
-;;; This code lives in the Floppy RAM buffer which must be unlocked
-;;; before it can be written to. (See QUARTERSHIM.ASM).
+	;;; This code lives in the Floppy RAM buffer which must be unlocked
+	;;; before it can be written to. (See QUARTERSHIM.ASM).
         ORG	FBEGIN	
+
+	;;; To unlock the first 8K of RAM, set bit 7 of port 7F to 1.
+	;;; Not required, but some ABS files may want to write there.
+	MVI	A,80H
+	OUT	7FH
 
 	;; If Shift+Reset was hit, serial port needs to be reconfigured.
 	CALL	SINT
+
+	;; XXX: Disable interrupts so we can overwrite the MONITOR's stack at 2032H
+	DI
 
 AWAIT:
 	;; h89trans.py sends 'B' before sending an ABS file, expects 'B'.
@@ -157,6 +165,13 @@ LOOP:	CALL    CHRIN       ; Read byte from serial into A
 	;; Let h89ldr.py know that we've received the file
         MVI	A,'B'
         CALL	CHROUT
+
+	;; Relock first 8K of RAM
+	XRA	A
+	OUT	7FH
+
+	;; XXX: Re-enable interrupts. (Remove this if we remove DI).
+	EI
 
 	;; --- EXECUTE NEXT STAGE ---
         PCHL                ; Jump to the received code's ENTRY address.
